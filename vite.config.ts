@@ -197,9 +197,6 @@ function blinkRouteTreeHealth() {
 }
 
 export default defineConfig({
-  // GitHub Pages serves this project at /Photoshare/. The deploy workflow sets
-  // VITE_BASE_PATH=/Photoshare/; locally and on Blink hosting it stays '/'.
-  base: process.env.VITE_BASE_PATH || '/',
   plugins: [
     blinkEnsureRootCss(),
     blinkRouteTreeHealth(),
