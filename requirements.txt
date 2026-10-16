@@ -1,2 +1,0 @@
-fast-alpr[onnx]
-opencv-python
