@@ -1,0 +1,270 @@
+import { useEffect, useState, type ReactNode } from 'react'
+import { createFileRoute } from '@tanstack/react-router'
+import {
+  ArrowUpRight, Check, Eye, Laptop, Monitor, Palette, Save,
+  Smartphone, Sparkles, Type,
+} from 'lucide-react'
+import { toast } from 'sonner'
+import { blink } from '@/blink/client'
+import { BlinkClientBoundary } from '@/components/BlinkClientBoundary'
+import type { PortfoliosRow } from '@/lib/db-types'
+
+/**
+ * Home route (/). A neutral, FULL-BLEED starting point — no app chrome, no
+ * sidebar. Replace this body with your real landing page or app home.
+ *
+ * Add more pages as files under `src/routes/` (e.g. `src/routes/about.tsx`
+ * → /about). The HTML document + providers live once in `__root.tsx`.
+ *
+ * Building a SaaS / dashboard app? The sidebar shell already exists at
+ * `src/routes/app.tsx` with its home at `src/routes/app/index.tsx` (→ /app) — add
+ * your pages as files in `src/routes/app/`. Do NOT create a `src/routes/_app.tsx`:
+ * a `_`-prefixed layout is PATHLESS, so `_app/index.tsx` resolves to `/` and
+ * collides with THIS file (build fails: "Conflicting configuration paths").
+ * Dashboard-only product? Keep this file and redirect it to `/app`.
+ * Landing pages, marketing sites, content, and games stay full-bleed (default) —
+ * delete `src/routes/app.tsx` + `src/routes/app/` if you don't need a dashboard.
+ *
+ * SEO: set per-page title/description/Open Graph here in `head()`.
+ *
+ * SSR / routing (this template is server-rendered — TanStack Start):
+ * - Routes are files under `src/routes/` that `export const Route =
+ *   createFileRoute('/path')({ component })`. NEVER `export default` a route.
+ *   Navigate with `Link` from `@tanstack/react-router` (there is no `NavLink`).
+ * - Reading Blink auth/SDK state (`blink.auth`), `localStorage`, or `window` at
+ *   render CRASHES SSR / hydration-mismatches and ships a blank first page. Wrap
+ *   that subtree in `<BlinkClientBoundary fallback={…}>` (from
+ *   `@/components/BlinkClientBoundary`) — wrap the whole tree if the entire page
+ *   needs the browser. Keep static content outside the boundary. Do NOT use the
+ *   route's `ssr: false`: a client-only route in this template hits Start's
+ *   server-context `node:async_hooks` path (a throwing browser stub) and ships a
+ *   BLANK preview ("AsyncLocalStorage is not a constructor").
+ */
+type PortfolioSettings = {
+  name: string
+  specialty: string
+  headline: string
+  location: string
+  selectedPhotos: string[]
+  theme: string
+}
+
+const initialSettings: PortfolioSettings = {
+  name: 'Maria Clark',
+  specialty: 'Photographer & visual storyteller',
+  headline: 'Images that feel like home.',
+  location: 'Based in Portland, Oregon',
+  selectedPhotos: ['portrait', 'wedding', 'coast', 'studio'],
+  theme: 'linen',
+}
+
+const photos = [
+  { id: 'portrait', title: 'Quiet moments', src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=85', alt: 'Portrait in warm afternoon light' },
+  { id: 'wedding', title: 'The garden vows', src: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=85', alt: 'An intimate outdoor wedding celebration' },
+  { id: 'coast', title: 'West coast, lately', src: 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=900&q=85', alt: 'Soft light across a coastal landscape' },
+  { id: 'studio', title: 'A little in-between', src: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=900&q=85', alt: 'Photographer making portraits on location' },
+]
+
+const themes = [
+  { id: 'linen', name: 'Linen', paper: '#f7f3ed', ink: '#332b25', accent: '#846b57', swatch: 'bg-[#eee3d4]' },
+  { id: 'sage', name: 'Sage', paper: '#eef0e9', ink: '#30372f', accent: '#74806c', swatch: 'bg-[#d9e0d2]' },
+  { id: 'dusk', name: 'Dusk', paper: '#282623', ink: '#f6f0e8', accent: '#d2b48e', swatch: 'bg-[#39332e]' },
+]
+
+const portfolioTable = blink.db.table<PortfoliosRow>('portfolios')
+const pendingDraftKey = 'folio-pending-draft'
+
+export const Route = createFileRoute('/')({
+  head: () => ({
+    meta: [
+      { title: 'Folio Studio — Portfolio Builder' },
+      { name: 'description', content: 'Shape a photography portfolio and see your website come together as you edit.' },
+    ],
+  }),
+  component: Home,
+})
+
+function Home() {
+  return <BlinkClientBoundary fallback={<LoadingScreen />}><PortfolioBuilder /></BlinkClientBoundary>
+}
+
+function PortfolioBuilder() {
+  const [user, setUser] = useState<{ id: string } | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
+  const [loadingDraft, setLoadingDraft] = useState(false)
+  const [draft, setDraft] = useState<PortfolioSettings>(initialSettings)
+  const [savedId, setSavedId] = useState<string | null>(null)
+  const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [activePanel, setActivePanel] = useState<'content' | 'style'>('content')
+  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
+  const [focusPreview, setFocusPreview] = useState(false)
+
+  useEffect(() => {
+    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
+      setUser(state.user)
+      if (!state.isLoading) {
+        setAuthLoading(false)
+        if (state.user) setLoadingDraft(true)
+      }
+    })
+    return unsubscribe
+  }, [])
+
+  const userId = user?.id
+
+  useEffect(() => {
+    if (!userId) return
+    let active = true
+    portfolioTable.list({ where: { userId }, orderBy: { updatedAt: 'desc' }, limit: 1 })
+      .then((rows) => {
+        if (!active) return
+        if (!rows[0]) {
+          const pendingDraft = window.sessionStorage.getItem(pendingDraftKey)
+          if (pendingDraft) {
+            try {
+              setDraft({ ...initialSettings, ...JSON.parse(pendingDraft) as Partial<PortfolioSettings> })
+              setSaved(false)
+            } catch {
+              toast.error('Your draft could not be restored after sign-in.')
+            } finally {
+              window.sessionStorage.removeItem(pendingDraftKey)
+            }
+          }
+          return
+        }
+        window.sessionStorage.removeItem(pendingDraftKey)
+        setSavedId(rows[0].id)
+        try {
+          setDraft({ ...initialSettings, ...JSON.parse(rows[0].settings) as Partial<PortfolioSettings> })
+          setSaved(true)
+        } catch {
+          toast.error('Your saved portfolio could not be opened.')
+        }
+      })
+      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : 'Could not load your portfolio.'))
+      .finally(() => { if (active) setLoadingDraft(false) })
+    return () => { active = false }
+  }, [userId])
+
+  const updateDraft = <K extends keyof PortfolioSettings>(key: K, value: PortfolioSettings[K]) => {
+    setDraft((current) => ({ ...current, [key]: value }))
+    setSaved(false)
+  }
+
+  const togglePhoto = (id: string) => {
+    const selectedPhotos = draft.selectedPhotos.includes(id)
+      ? draft.selectedPhotos.filter((photoId) => photoId !== id)
+      : [...draft.selectedPhotos, id]
+    updateDraft('selectedPhotos', selectedPhotos)
+  }
+
+  const savePortfolio = async () => {
+    if (!user) {
+      toast('Sign in to save your portfolio draft.')
+      window.sessionStorage.setItem(pendingDraftKey, JSON.stringify(draft))
+      blink.auth.login(window.location.href)
+      return
+    }
+    setSaving(true)
+    try {
+      const updatedAt = new Date().toISOString()
+      const payload = { name: draft.name, settings: JSON.stringify(draft), updatedAt }
+      if (savedId) {
+        await portfolioTable.update(savedId, payload)
+      } else {
+        const created = await portfolioTable.create({ ...payload, userId: user.id })
+        setSavedId(created.id)
+      }
+      setSaved(true)
+      window.sessionStorage.removeItem(pendingDraftKey)
+      toast.success('Your portfolio draft is saved.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Your portfolio could not be saved.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const selectedTheme = themes.find((theme) => theme.id === draft.theme) ?? themes[0]
+  const selectedPhotos = photos.filter((photo) => draft.selectedPhotos.includes(photo.id))
+
+  if (authLoading) return <LoadingScreen />
+
+  return (
+    <main className="flex min-h-dvh flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-border/80 bg-card/95 px-4 backdrop-blur-md sm:px-7">
+        <div className="flex items-center gap-4 sm:gap-8">
+          <a href="/" className="flex items-center gap-2" aria-label="Folio Studio home">
+            <span className="font-serif text-[25px] font-semibold tracking-tight">folio</span>
+            <span className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em] text-muted-foreground sm:inline">STUDIO</span>
+          </a>
+          <div className="hidden h-7 w-px bg-border sm:block" />
+          <div className="hidden sm:block"><p className="text-xs text-muted-foreground">Your workspace</p><p className="text-sm font-medium">Website builder</p></div>
+        </div>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="hidden items-center gap-2 pr-2 text-xs text-muted-foreground sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${saved ? 'bg-emerald-600' : 'bg-amber-500'}`} />{loadingDraft ? 'Loading draft…' : saved ? 'All changes saved' : 'Unsaved changes'}</div>
+          <button onClick={() => setFocusPreview((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium transition hover:bg-secondary active:scale-[0.98]"><Eye className="h-4 w-4" /><span className="hidden sm:inline">{focusPreview ? 'Back to editor' : 'Focus preview'}</span></button>
+          <button onClick={savePortfolio} disabled={saving} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 sm:px-4">{saved && !saving ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}<span>{saving ? 'Saving…' : user ? 'Save draft' : 'Sign in to save'}</span></button>
+        </div>
+      </header>
+
+      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-3 py-4 sm:px-6 sm:py-6">
+        <div className="mb-4 flex items-end justify-between px-1 sm:mb-5"><div><p className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Your website</p><h1 className="font-serif text-2xl tracking-tight sm:text-[28px]">A little space for your work.</h1></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex"><Sparkles className="h-3.5 w-3.5 text-primary" /> Your edits update live</span></div>
+
+        <div className="grid flex-1 gap-4 lg:min-h-[calc(100dvh-155px)] lg:grid-cols-[350px_minmax(0,1fr)] xl:gap-5">
+          {!focusPreview && <aside className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:min-h-0">
+            <div className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold">Homepage</h2><p className="mt-0.5 text-xs text-muted-foreground">Edit your first page</p></div><span title="Homepage layout" className="rounded-lg p-2 text-muted-foreground"><Monitor className="h-4 w-4" /></span></div>
+            <div className="grid grid-cols-2 border-b border-border p-1.5">
+              <button onClick={() => setActivePanel('content')} className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition ${activePanel === 'content' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Type className="h-4 w-4" /> Content</button>
+              <button onClick={() => setActivePanel('style')} className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition ${activePanel === 'style' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Palette className="h-4 w-4" /> Style</button>
+            </div>
+            <div className="flex-1 space-y-5 overflow-y-auto p-5">
+              {activePanel === 'content' ? <>
+                <div className="space-y-4">
+                  <Field label="Your name"><input value={draft.name} onChange={(event) => updateDraft('name', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
+                  <Field label="What you do"><input value={draft.specialty} onChange={(event) => updateDraft('specialty', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
+                  <Field label="Intro headline"><textarea rows={2} value={draft.headline} onChange={(event) => updateDraft('headline', event.target.value)} className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
+                  <Field label="Location"><input value={draft.location} onChange={(event) => updateDraft('location', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
+                </div>
+                <div className="border-t border-border pt-4"><div className="mb-3 flex items-end justify-between"><div><h3 className="text-sm font-semibold">Featured work</h3><p className="mt-1 text-xs text-muted-foreground">Choose what visitors see first</p></div><span className="font-mono text-[10px] text-muted-foreground">{selectedPhotos.length} SELECTED</span></div>
+                  <div className="grid grid-cols-2 gap-2.5">{photos.map((photo) => { const isSelected = draft.selectedPhotos.includes(photo.id); return <button key={photo.id} onClick={() => togglePhoto(photo.id)} aria-pressed={isSelected} className={`group relative overflow-hidden rounded-xl border-2 text-left transition hover:-translate-y-0.5 ${isSelected ? 'border-primary' : 'border-transparent'}`}><img src={photo.src} alt={photo.alt} className="h-[94px] w-full object-cover transition duration-300 group-hover:scale-105" /><span className="block truncate bg-secondary/70 px-2 py-1.5 text-[11px] text-secondary-foreground">{photo.title}</span>{isSelected && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}</button> })}</div>
+                </div>
+              </> : <>
+                <div><div className="mb-3"><h3 className="text-sm font-semibold">Choose a palette</h3><p className="mt-1 text-xs text-muted-foreground">A quiet backdrop for your images.</p></div><div className="space-y-2">{themes.map((theme) => <button key={theme.id} onClick={() => updateDraft('theme', theme.id)} aria-pressed={draft.theme === theme.id} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-primary/60 ${draft.theme === theme.id ? 'border-primary bg-secondary/50' : 'border-border'}`}><span className={`h-10 w-10 rounded-lg border border-foreground/10 ${theme.swatch}`} /><span className="flex-1"><span className="block text-sm font-medium">{theme.name}</span><span className="text-xs text-muted-foreground">Soft, editorial tones</span></span>{draft.theme === theme.id && <Check className="h-4 w-4 text-primary" />}</button>)}</div></div>
+                <div className="border-t border-border pt-4"><h3 className="text-sm font-semibold">Typography</h3><p className="mt-1 text-xs text-muted-foreground">A considered pairing for a personal feel.</p><div className="mt-3 rounded-xl border border-border bg-background p-3"><p className="font-serif text-lg">Aa <span className="text-sm">Lora</span></p><p className="mt-1 text-xs text-muted-foreground">For headlines and gentle emphasis</p></div><div className="mt-2 rounded-xl border border-border bg-background p-3"><p className="text-lg font-medium">Aa <span className="text-sm">DM Sans</span></p><p className="mt-1 text-xs text-muted-foreground">For clear, comfortable reading</p></div></div>
+              </>}
+            </div>
+            <div className="border-t border-border bg-secondary/30 px-5 py-3 text-xs text-muted-foreground">Changes are only saved when you choose <span className="font-medium text-foreground">Save draft</span>.</div>
+          </aside>}
+
+          <section className="flex min-h-[620px] flex-col overflow-hidden rounded-2xl border border-border bg-[#e9e5de] shadow-sm lg:min-h-0" aria-label="Live website preview">
+            <div className="flex h-[54px] shrink-0 items-center justify-between border-b border-[#ddd8cf] bg-card px-3 sm:px-4"><div className="flex min-w-0 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary"><Eye className="h-3.5 w-3.5" /></span><div className="min-w-0"><p className="truncate text-xs font-medium">Your live preview</p><p className="hidden text-[10px] text-muted-foreground sm:block">folio.site / {draft.name.toLowerCase().replace(/ /g, '-')}</p></div></div><div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1"><button onClick={() => setDevice('desktop')} aria-label="Desktop preview" aria-pressed={device === 'desktop'} className={`rounded-md p-1.5 transition ${device === 'desktop' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Monitor className="h-4 w-4" /></button><button onClick={() => setDevice('mobile')} aria-label="Mobile preview" aria-pressed={device === 'mobile'} className={`rounded-md p-1.5 transition ${device === 'mobile' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Smartphone className="h-4 w-4" /></button></div></div>
+            <div className="flex flex-1 justify-center overflow-auto p-3 sm:p-6"><div className={`my-auto min-h-full overflow-hidden shadow-lg transition-all duration-300 ${device === 'mobile' ? 'w-[390px] max-w-full rounded-[1.8rem] border-[7px] border-[#282623]' : 'w-full rounded-xl'}`}><PortfolioPreview draft={draft} theme={selectedTheme} selectedPhotos={selectedPhotos} /></div></div>
+          </section>
+        </div>
+        <div className="mt-3 flex items-center justify-between px-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><Laptop className="h-3.5 w-3.5" /> Responsive by design</span><span className="hidden sm:inline">{user ? 'Saved drafts are private to your account' : 'Sign in to save this draft across devices'}</span><button onClick={() => setFocusPreview((value) => !value)} className="flex items-center gap-1 transition hover:text-foreground">{focusPreview ? 'Show editor' : 'More room'} <ArrowUpRight className="h-3 w-3" /></button></div>
+      </div>
+    </main>
+  )
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="block space-y-1.5"><span className="block text-xs font-medium text-secondary-foreground">{label}</span>{children}</label>
+}
+
+function PortfolioPreview({ draft, theme, selectedPhotos }: { draft: PortfolioSettings; theme: (typeof themes)[number]; selectedPhotos: typeof photos }) {
+  return (
+    <div className="min-h-full" style={{ backgroundColor: theme.paper, color: theme.ink }}>
+      <nav className="flex items-center justify-between px-5 py-4 sm:px-9 sm:py-6" aria-label="Portfolio website"><span className="font-serif text-sm font-medium sm:text-base">{draft.name || 'Your name'}</span><div className="flex items-center gap-3 text-[9px] sm:gap-6 sm:text-[11px]" style={{ color: theme.ink }}><a href="#work" className="transition-opacity hover:opacity-60">Selected work</a><a href="#about" className="hidden transition-opacity hover:opacity-60 sm:inline">About</a><a href="#contact" className="transition-opacity hover:opacity-60">Contact <ArrowUpRight className="ml-0.5 inline h-3 w-3" /></a></div></nav>
+      <section className="grid items-center gap-5 px-5 pb-7 pt-4 sm:grid-cols-[0.82fr_1.18fr] sm:gap-8 sm:px-9 sm:pb-10 sm:pt-3"><div className="order-2 sm:order-1"><p className="mb-3 text-[9px] uppercase tracking-[0.2em] sm:mb-5 sm:text-[10px]" style={{ color: theme.accent }}>{draft.specialty || 'Photographer'}</p><h2 className="max-w-sm font-serif text-[34px] leading-[1.07] tracking-[-0.04em] sm:text-[clamp(38px,4.2vw,68px)]">{draft.headline || 'Your story, in photographs.'}</h2><p className="mt-3 text-[10px] sm:mt-5 sm:text-xs" style={{ color: theme.accent }}>{draft.location || 'Based somewhere lovely'}</p><a href="#work" className="mt-5 inline-flex items-center gap-2 border-b pb-1 text-[10px] font-medium sm:mt-8 sm:text-xs" style={{ borderColor: theme.accent }}>Explore my work <ArrowUpRight className="h-3 w-3" /></a></div><div className="order-1 relative h-[210px] overflow-hidden sm:order-2 sm:h-[clamp(260px,34vw,470px)]">{selectedPhotos[0] ? <img src={selectedPhotos[0].src} alt={selectedPhotos[0].alt} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center bg-secondary/50 text-sm text-muted-foreground">Choose a featured photo</div>}<span className="absolute bottom-3 left-3 bg-card/90 px-2.5 py-1.5 text-[9px] tracking-wide">01 — {selectedPhotos[0]?.title ?? 'Featured work'}</span></div></section>
+      <section id="work" className="px-5 pb-8 sm:px-9 sm:pb-12"><div className="mb-3 flex items-end justify-between border-t pt-4 sm:mb-5 sm:pt-6" style={{ borderColor: `${theme.ink}22` }}><div><p className="text-[8px] uppercase tracking-[0.2em]" style={{ color: theme.accent }}>A collection of moments</p><h3 className="mt-1 font-serif text-lg sm:text-2xl">Selected work</h3></div><span className="text-[9px] sm:text-[10px]">{String(selectedPhotos.length).padStart(2, '0')} stories</span></div>{selectedPhotos.length > 1 ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">{selectedPhotos.slice(1).map((photo, index) => <figure key={photo.id} className="group overflow-hidden"><img src={photo.src} alt={photo.alt} className="aspect-[1.1] w-full object-cover transition duration-500 group-hover:scale-[1.03]" /><figcaption className="pt-1.5 text-[9px] sm:pt-2 sm:text-[10px]">{String(index + 2).padStart(2, '0')} — {photo.title}</figcaption></figure>)}</div> : <p className="py-8 text-sm" style={{ color: theme.accent }}>Select a few more photos to build your gallery.</p>}</section>
+      <section id="about" className="flex items-center justify-between border-t px-5 py-4 sm:px-9 sm:py-6" style={{ borderColor: `${theme.ink}22` }}><p className="max-w-xs font-serif text-sm sm:text-lg">“The ordinary is where the extraordinary begins.”</p><p className="text-[9px] uppercase tracking-[0.16em] sm:text-[10px]">{draft.name || 'Your name'} · {draft.location}</p></section>
+      <footer id="contact" className="flex items-center justify-between px-5 py-3 text-[9px] sm:px-9 sm:py-4 sm:text-[10px]" style={{ backgroundColor: theme.ink, color: theme.paper }}><span>Have a story to tell?</span><a href="mailto:hello@example.com" className="font-medium transition-opacity hover:opacity-70">Let’s make something <ArrowUpRight className="ml-1 inline h-3 w-3" /></a></footer>
+    </div>
+  )
+}
+
+function LoadingScreen() {
+  return <div className="flex min-h-dvh items-center justify-center bg-background"><div className="flex items-center gap-3 text-sm text-muted-foreground"><span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />Opening your studio…</div></div>
+}
