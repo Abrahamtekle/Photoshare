@@ -1,0 +1,85 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Lora:wght@400;500;600&display=swap');
+@import "tailwindcss";
+@import "tw-animate-css";
+@plugin "@tailwindcss/typography";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-serif: 'Lora', Georgia, ui-serif, serif;
+}
+
+:root {
+  --radius: 0.625rem;
+  --background: #f7f3ed;
+  --foreground: #332b25;
+  --card: #fffdf9;
+  --card-foreground: #332b25;
+  --popover: #fffdf9;
+  --popover-foreground: #332b25;
+  --primary: #846b57;
+  --primary-foreground: #fffdf9;
+  --secondary: #eee3d4;
+  --secondary-foreground: #4a3f36;
+  --muted: #efe8de;
+  --muted-foreground: #7a6d62;
+  --accent: #eee3d4;
+  --accent-foreground: #332b25;
+  --destructive: #c2410c;
+  --border: #e2d9cc;
+  --input: #d9cfc0;
+  --ring: #846b57;
+}
+
+.dark {
+  --background: #282623;
+  --foreground: #f6f0e8;
+  --card: #322f2b;
+  --card-foreground: #f6f0e8;
+  --popover: #322f2b;
+  --popover-foreground: #f6f0e8;
+  --primary: #d2b48e;
+  --primary-foreground: #282623;
+  --secondary: #39332e;
+  --secondary-foreground: #f6f0e8;
+  --muted: #39332e;
+  --muted-foreground: #b3a798;
+  --accent: #39332e;
+  --accent-foreground: #f6f0e8;
+  --destructive: #ef6a3a;
+  --border: #433d37;
+  --input: #4d463f;
+  --ring: #d2b48e;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
