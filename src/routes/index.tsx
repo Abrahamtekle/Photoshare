@@ -1,270 +1,250 @@
-import { useEffect, useState, type ReactNode } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import {
-  ArrowUpRight, Check, Eye, Laptop, Monitor, Palette, Save,
-  Smartphone, Sparkles, Type,
-} from 'lucide-react'
-import { toast } from 'sonner'
-import { blink } from '@/blink/client'
-import { BlinkClientBoundary } from '@/components/BlinkClientBoundary'
-import type { PortfoliosRow } from '@/lib/db-types'
 
-/**
- * Home route (/). A neutral, FULL-BLEED starting point — no app chrome, no
- * sidebar. Replace this body with your real landing page or app home.
- *
- * Add more pages as files under `src/routes/` (e.g. `src/routes/about.tsx`
- * → /about). The HTML document + providers live once in `__root.tsx`.
- *
- * Building a SaaS / dashboard app? The sidebar shell already exists at
- * `src/routes/app.tsx` with its home at `src/routes/app/index.tsx` (→ /app) — add
- * your pages as files in `src/routes/app/`. Do NOT create a `src/routes/_app.tsx`:
- * a `_`-prefixed layout is PATHLESS, so `_app/index.tsx` resolves to `/` and
- * collides with THIS file (build fails: "Conflicting configuration paths").
- * Dashboard-only product? Keep this file and redirect it to `/app`.
- * Landing pages, marketing sites, content, and games stay full-bleed (default) —
- * delete `src/routes/app.tsx` + `src/routes/app/` if you don't need a dashboard.
- *
- * SEO: set per-page title/description/Open Graph here in `head()`.
- *
- * SSR / routing (this template is server-rendered — TanStack Start):
- * - Routes are files under `src/routes/` that `export const Route =
- *   createFileRoute('/path')({ component })`. NEVER `export default` a route.
- *   Navigate with `Link` from `@tanstack/react-router` (there is no `NavLink`).
- * - Reading Blink auth/SDK state (`blink.auth`), `localStorage`, or `window` at
- *   render CRASHES SSR / hydration-mismatches and ships a blank first page. Wrap
- *   that subtree in `<BlinkClientBoundary fallback={…}>` (from
- *   `@/components/BlinkClientBoundary`) — wrap the whole tree if the entire page
- *   needs the browser. Keep static content outside the boundary. Do NOT use the
- *   route's `ssr: false`: a client-only route in this template hits Start's
- *   server-context `node:async_hooks` path (a throwing browser stub) and ships a
- *   BLANK preview ("AsyncLocalStorage is not a constructor").
- */
-type PortfolioSettings = {
-  name: string
-  specialty: string
-  headline: string
-  location: string
-  selectedPhotos: string[]
-  theme: string
-}
+const heroImage =
+  'https://i.wfolio.com/x/D48ScH1DA6jxU_uSH-Or-C0cJClpP-QP/lEAL128xEMPGM2o_rKw_kMPHKR9vAJ80/AElTZ6-GAUFXmohcGp-MzTSBeOAp42Pk/vFVMPok_GxaJ1hW_937CYBmxSKTdSImi/gwgWCDD_j4_tajFMFWRwxg.jpg'
 
-const initialSettings: PortfolioSettings = {
-  name: 'Maria Clark',
-  specialty: 'Photographer & visual storyteller',
-  headline: 'Images that feel like home.',
-  location: 'Based in Portland, Oregon',
-  selectedPhotos: ['portrait', 'wedding', 'coast', 'studio'],
-  theme: 'linen',
-}
-
-const photos = [
-  { id: 'portrait', title: 'Quiet moments', src: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=900&q=85', alt: 'Portrait in warm afternoon light' },
-  { id: 'wedding', title: 'The garden vows', src: 'https://images.unsplash.com/photo-1519741497674-611481863552?auto=format&fit=crop&w=900&q=85', alt: 'An intimate outdoor wedding celebration' },
-  { id: 'coast', title: 'West coast, lately', src: 'https://images.unsplash.com/photo-1470252649378-9c29740c9fa8?auto=format&fit=crop&w=900&q=85', alt: 'Soft light across a coastal landscape' },
-  { id: 'studio', title: 'A little in-between', src: 'https://images.unsplash.com/photo-1492691527719-9d1e07e534b4?auto=format&fit=crop&w=900&q=85', alt: 'Photographer making portraits on location' },
+const featureCards = [
+  {
+    title: 'Sell products and services online',
+    description: 'Create a storefront for your photos, products, and services, with inquiries and online payments.',
+    image: 'https://i.wfolio.com/x/M5WK4BLIgG-qyI8ZOeSuCkq8wa8L1RO1/el2Cn27_lTYb0d7zo24iltXo3Au_bmKO/DwmminVp1S5uLdbvtyDRHx6RHv32rloO/rDDQlucKq9mujSySCP5dqnzlazn56v74/M-gMsQeDvWLpZ-JHvGu7V3vkVB7v5NvS/939n9trdYU_k78MHJ9DfJlqzTRgR_wH7.jpg',
+    className: 'md:col-span-7',
+  },
+  {
+    title: 'AI photo retouching in galleries',
+    description: 'Spend less time on routine edits and more time behind the camera.',
+    image: 'https://i.wfolio.com/x/M5WK4BLIgG-qyI8ZOeSuCkq8wa8L1RO1/el2Cn27_lTYb0d7zo24iltXo3Au_bmKO/DwmminVp1S5uLdbvtyDRHx6RHv32rloO/rDDQlucKq9lGfS3oqpXIDkWgw5wbozXJ/DzPw6lIkuhiQYp53opDcjb2XPKiCwk3k/A1SkrQkwgv4DBotgjXAJZ5p0AGVwRrYb.jpg',
+    className: 'md:col-span-5',
+  },
+  {
+    title: 'Wfolio Online Magazine',
+    description: 'Photography news, interviews, inspiration, and gear reviews.',
+    image: 'https://i.wfolio.com/x/wj_aLy0Hz134YM1lmH1WUO2TyGFgCxkM/yM3YVYkuwM08PNyLak0svh8fndbEC-3y/28E58Y51De9VkJafhaUdHGkX8NIZ2Sgl/cwOZRN6xdHcys7QTGtupvq0x0yIeI2KH/lZskuFdvBCc00SO818px_lq_EH0_j4Qz/3K5J1ATcjdDaf6Omf0uHz2duH6t4-RCq.jpg',
+    className: 'md:col-span-5',
+  },
+  {
+    title: 'Tools that help you get found',
+    description: 'Share galleries, grow website traffic, and make your work easier to discover.',
+    image: 'https://i.wfolio.com/x/lAzvD6V3zDvNTGHYMVRoG3hwAXklo3Zp/TjFrczNGWRmzUb8jcNARnGYYVZyjlIqw/DagJOq1TdvaQqNGjE7aS3BLeFjGL6_s5/195HV04b8e-gEvklD0Sxsg1HoB1VluV1/bzXZhpk_GZ8gzonZUmASjW49daN-mE4a/9y9TFiTbanedsHGa6Gjh6yFQCZ0kN-vj.jpg',
+    className: 'md:col-span-7',
+  },
 ]
 
-const themes = [
-  { id: 'linen', name: 'Linen', paper: '#f7f3ed', ink: '#332b25', accent: '#846b57', swatch: 'bg-[#eee3d4]' },
-  { id: 'sage', name: 'Sage', paper: '#eef0e9', ink: '#30372f', accent: '#74806c', swatch: 'bg-[#d9e0d2]' },
-  { id: 'dusk', name: 'Dusk', paper: '#282623', ink: '#f6f0e8', accent: '#d2b48e', swatch: 'bg-[#39332e]' },
+const benefits = [
+  ['STYLISH DESIGNS', 'A beautiful website that lets your work take center stage.'],
+  ['EASY TO FIND', 'Tools to help clients discover your photography online.'],
+  ['CONTENT PROTECTION', 'Control access to photos, videos, and client galleries.'],
+  ['FRIENDLY INTERFACE', 'Build pages and deliver photos without a technical learning curve.'],
+  ['HIGH SPEED', 'Fast file uploads and a smooth gallery experience.'],
+  ['SALES TOOLS', 'Offer photos, products, and services directly to clients.'],
+  ['VIDEO TOOLS', 'Share films and video alongside your photography.'],
+  ['REAL SUPPORT', 'Get friendly guidance when you need a hand.'],
 ]
 
-const portfolioTable = blink.db.table<PortfoliosRow>('portfolios')
-const pendingDraftKey = 'folio-pending-draft'
+const galleryFaces = [
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-QS5mmu9Q3Nun/iIJCyoZzKuSYXYxUnohp2ONuT228Zm30/xt35mpuO22T_5TPJawM0kA.jpg',
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-QR8zh0vrSEmg/x3VeeJyS_MrSJMOhDmirrs704WO2M5kz/8NB-OoPSS_PHsa54Dqzjpg.jpg',
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-QeLhoEc996i8/9YyFNTw07Btup7BMEGH636xpyuKT6UEb/gM2cOJ0xKcEFJf8ZBCZLbA.jpg',
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-Qcp8g1sOY3Rs/6POaZYJJBfFhFuw4i4wcZGzPWNyejxyx/SD0X4Ko_F4cJ2LLPlgaZ5Q.jpg',
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-QVA6EfsdBqYC/gU3TAd3sIGAwx6_BGsQ0mcGs1hPLQq07/6hzrTimr3H9QHDVXUPx8RQ.jpg',
+  'https://i.wfolio.com/x/XEFEvE-Nu381pOR4oV5MYSopDF7zkmTY/WZ0alsqm43-yFFOJVKcjqK51HjRSra7U/DuFIwoaGJQqOZ7vqujq-QfKWASM9Ioap/TbzlSm2lSQtOJQoCXI_hiy68BhtOSxuz/WkxYj44m2sVENwwxZOk4RQ.jpg',
+]
+
+const questions = [
+  ['Why does a photographer need a website?', 'A dedicated website gives your work a home, helps potential clients understand your services, and makes it easier to get in touch.'],
+  ['Can I create a website on my own?', 'Yes. Choose a ready-made design, add your images and information, then adjust the pages to fit your style.'],
+  ['Can I share client galleries privately?', 'Yes. Galleries can be shared with secure links and privacy settings, so you can deliver work directly to each client.'],
+  ['I’m a beginner. Where should I start?', 'Start with a portfolio and contact page. You can add galleries and services as your photography business grows.'],
+]
 
 export const Route = createFileRoute('/')({
   head: () => ({
     meta: [
-      { title: 'Folio Studio — Portfolio Builder' },
-      { name: 'description', content: 'Shape a photography portfolio and see your website come together as you edit.' },
+      { title: 'Wfolio — a website builder and cloud drive for photographers' },
+      { name: 'description', content: 'Create a beautiful photography website, share client galleries, and grow your creative business with Wfolio.' },
     ],
   }),
   component: Home,
 })
 
 function Home() {
-  return <BlinkClientBoundary fallback={<LoadingScreen />}><PortfolioBuilder /></BlinkClientBoundary>
-}
-
-function PortfolioBuilder() {
-  const [user, setUser] = useState<{ id: string } | null>(null)
-  const [authLoading, setAuthLoading] = useState(true)
-  const [loadingDraft, setLoadingDraft] = useState(false)
-  const [draft, setDraft] = useState<PortfolioSettings>(initialSettings)
-  const [savedId, setSavedId] = useState<string | null>(null)
-  const [saved, setSaved] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [activePanel, setActivePanel] = useState<'content' | 'style'>('content')
-  const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
-  const [focusPreview, setFocusPreview] = useState(false)
-
-  useEffect(() => {
-    const unsubscribe = blink.auth.onAuthStateChanged((state) => {
-      setUser(state.user)
-      if (!state.isLoading) {
-        setAuthLoading(false)
-        if (state.user) setLoadingDraft(true)
-      }
-    })
-    return unsubscribe
-  }, [])
-
-  const userId = user?.id
-
-  useEffect(() => {
-    if (!userId) return
-    let active = true
-    portfolioTable.list({ where: { userId }, orderBy: { updatedAt: 'desc' }, limit: 1 })
-      .then((rows) => {
-        if (!active) return
-        if (!rows[0]) {
-          const pendingDraft = window.sessionStorage.getItem(pendingDraftKey)
-          if (pendingDraft) {
-            try {
-              setDraft({ ...initialSettings, ...JSON.parse(pendingDraft) as Partial<PortfolioSettings> })
-              setSaved(false)
-            } catch {
-              toast.error('Your draft could not be restored after sign-in.')
-            } finally {
-              window.sessionStorage.removeItem(pendingDraftKey)
-            }
-          }
-          return
-        }
-        window.sessionStorage.removeItem(pendingDraftKey)
-        setSavedId(rows[0].id)
-        try {
-          setDraft({ ...initialSettings, ...JSON.parse(rows[0].settings) as Partial<PortfolioSettings> })
-          setSaved(true)
-        } catch {
-          toast.error('Your saved portfolio could not be opened.')
-        }
-      })
-      .catch((error: unknown) => toast.error(error instanceof Error ? error.message : 'Could not load your portfolio.'))
-      .finally(() => { if (active) setLoadingDraft(false) })
-    return () => { active = false }
-  }, [userId])
-
-  const updateDraft = <K extends keyof PortfolioSettings>(key: K, value: PortfolioSettings[K]) => {
-    setDraft((current) => ({ ...current, [key]: value }))
-    setSaved(false)
-  }
-
-  const togglePhoto = (id: string) => {
-    const selectedPhotos = draft.selectedPhotos.includes(id)
-      ? draft.selectedPhotos.filter((photoId) => photoId !== id)
-      : [...draft.selectedPhotos, id]
-    updateDraft('selectedPhotos', selectedPhotos)
-  }
-
-  const savePortfolio = async () => {
-    if (!user) {
-      toast('Sign in to save your portfolio draft.')
-      window.sessionStorage.setItem(pendingDraftKey, JSON.stringify(draft))
-      blink.auth.login(window.location.href)
-      return
-    }
-    setSaving(true)
-    try {
-      const updatedAt = new Date().toISOString()
-      const payload = { name: draft.name, settings: JSON.stringify(draft), updatedAt }
-      if (savedId) {
-        await portfolioTable.update(savedId, payload)
-      } else {
-        const created = await portfolioTable.create({ ...payload, userId: user.id })
-        setSavedId(created.id)
-      }
-      setSaved(true)
-      window.sessionStorage.removeItem(pendingDraftKey)
-      toast.success('Your portfolio draft is saved.')
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Your portfolio could not be saved.')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  const selectedTheme = themes.find((theme) => theme.id === draft.theme) ?? themes[0]
-  const selectedPhotos = photos.filter((photo) => draft.selectedPhotos.includes(photo.id))
-
-  if (authLoading) return <LoadingScreen />
-
   return (
-    <main className="flex min-h-dvh flex-col bg-background text-foreground">
-      <header className="sticky top-0 z-20 flex h-[68px] items-center justify-between border-b border-border/80 bg-card/95 px-4 backdrop-blur-md sm:px-7">
-        <div className="flex items-center gap-4 sm:gap-8">
-          <a href={import.meta.env.BASE_URL} className="flex items-center gap-2" aria-label="Folio Studio home">
-            <span className="font-serif text-[25px] font-semibold tracking-tight">folio</span>
-            <span className="hidden rounded border border-border px-1.5 py-0.5 font-mono text-[9px] tracking-[0.16em] text-muted-foreground sm:inline">STUDIO</span>
-          </a>
-          <div className="hidden h-7 w-px bg-border sm:block" />
-          <div className="hidden sm:block"><p className="text-xs text-muted-foreground">Your workspace</p><p className="text-sm font-medium">Website builder</p></div>
-        </div>
-        <div className="flex items-center gap-2 sm:gap-3">
-          <div className="hidden items-center gap-2 pr-2 text-xs text-muted-foreground sm:flex"><span className={`h-1.5 w-1.5 rounded-full ${saved ? 'bg-emerald-600' : 'bg-amber-500'}`} />{loadingDraft ? 'Loading draft…' : saved ? 'All changes saved' : 'Unsaved changes'}</div>
-          <button onClick={() => setFocusPreview((value) => !value)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-border bg-card px-3 text-sm font-medium transition hover:bg-secondary active:scale-[0.98]"><Eye className="h-4 w-4" /><span className="hidden sm:inline">{focusPreview ? 'Back to editor' : 'Focus preview'}</span></button>
-          <button onClick={savePortfolio} disabled={saving} className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-105 active:scale-[0.98] disabled:opacity-60 sm:px-4">{saved && !saving ? <Check className="h-4 w-4" /> : <Save className="h-4 w-4" />}<span>{saving ? 'Saving…' : user ? 'Save draft' : 'Sign in to save'}</span></button>
+    <main className="overflow-hidden bg-background text-foreground">
+      <header className="sticky top-0 z-30 border-b border-border/70 bg-background/95 backdrop-blur-sm">
+        <div className="mx-auto flex h-[72px] max-w-[1320px] items-center justify-between px-5 sm:px-8">
+          <a href="#top" aria-label="Wfolio home" className="font-serif text-[25px] font-bold tracking-[-0.07em]">wfolio</a>
+          <nav aria-label="Main navigation" className="hidden items-center gap-8 text-[13px] font-medium md:flex">
+            <a className="transition-colors hover:text-muted-foreground" href="#platform">Platform</a>
+            <a className="transition-colors hover:text-muted-foreground" href="#work">For photographers</a>
+            <a className="transition-colors hover:text-muted-foreground" href="#pricing">Pricing</a>
+            <a className="transition-colors hover:text-muted-foreground" href="#faq">FAQ</a>
+          </nav>
+          <div className="flex items-center gap-3">
+            <a href="#pricing" className="hidden px-2 py-2 text-[13px] font-medium transition-opacity hover:opacity-60 sm:inline-flex">Log in</a>
+            <a href="#pricing" className="rounded-full bg-foreground px-5 py-3 text-[12px] font-semibold text-background transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]">Try for free</a>
+            <details className="relative md:hidden">
+              <summary className="cursor-pointer list-none rounded-full border border-border px-3 py-2 text-xs">Menu</summary>
+              <nav aria-label="Mobile navigation" className="absolute right-0 top-12 flex min-w-48 flex-col gap-4 rounded-xl border border-border bg-card p-5 text-sm shadow-lg">
+                <a href="#platform">Platform</a><a href="#work">For photographers</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a>
+              </nav>
+            </details>
+          </div>
         </div>
       </header>
 
-      <div className="mx-auto flex w-full max-w-[1600px] flex-1 flex-col px-3 py-4 sm:px-6 sm:py-6">
-        <div className="mb-4 flex items-end justify-between px-1 sm:mb-5"><div><p className="mb-1 font-mono text-[10px] uppercase tracking-[0.2em] text-primary">Your website</p><h1 className="font-serif text-2xl tracking-tight sm:text-[28px]">A little space for your work.</h1></div><span className="hidden items-center gap-1.5 text-xs text-muted-foreground md:flex"><Sparkles className="h-3.5 w-3.5 text-primary" /> Your edits update live</span></div>
-
-        <div className="grid flex-1 gap-4 lg:min-h-[calc(100dvh-155px)] lg:grid-cols-[350px_minmax(0,1fr)] xl:gap-5">
-          {!focusPreview && <aside className="flex min-h-[520px] flex-col overflow-hidden rounded-2xl border border-border bg-card shadow-sm lg:min-h-0">
-            <div className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold">Homepage</h2><p className="mt-0.5 text-xs text-muted-foreground">Edit your first page</p></div><span title="Homepage layout" className="rounded-lg p-2 text-muted-foreground"><Monitor className="h-4 w-4" /></span></div>
-            <div className="grid grid-cols-2 border-b border-border p-1.5">
-              <button onClick={() => setActivePanel('content')} className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition ${activePanel === 'content' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Type className="h-4 w-4" /> Content</button>
-              <button onClick={() => setActivePanel('style')} className={`flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-medium transition ${activePanel === 'style' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Palette className="h-4 w-4" /> Style</button>
-            </div>
-            <div className="flex-1 space-y-5 overflow-y-auto p-5">
-              {activePanel === 'content' ? <>
-                <div className="space-y-4">
-                  <Field label="Your name"><input value={draft.name} onChange={(event) => updateDraft('name', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
-                  <Field label="What you do"><input value={draft.specialty} onChange={(event) => updateDraft('specialty', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
-                  <Field label="Intro headline"><textarea rows={2} value={draft.headline} onChange={(event) => updateDraft('headline', event.target.value)} className="w-full resize-none rounded-lg border border-input bg-background px-3 py-2.5 text-sm leading-relaxed outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
-                  <Field label="Location"><input value={draft.location} onChange={(event) => updateDraft('location', event.target.value)} className="w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm outline-none transition focus:border-primary focus:ring-2 focus:ring-ring/20" /></Field>
-                </div>
-                <div className="border-t border-border pt-4"><div className="mb-3 flex items-end justify-between"><div><h3 className="text-sm font-semibold">Featured work</h3><p className="mt-1 text-xs text-muted-foreground">Choose what visitors see first</p></div><span className="font-mono text-[10px] text-muted-foreground">{selectedPhotos.length} SELECTED</span></div>
-                  <div className="grid grid-cols-2 gap-2.5">{photos.map((photo) => { const isSelected = draft.selectedPhotos.includes(photo.id); return <button key={photo.id} onClick={() => togglePhoto(photo.id)} aria-pressed={isSelected} className={`group relative overflow-hidden rounded-xl border-2 text-left transition hover:-translate-y-0.5 ${isSelected ? 'border-primary' : 'border-transparent'}`}><img src={photo.src} alt={photo.alt} className="h-[94px] w-full object-cover transition duration-300 group-hover:scale-105" /><span className="block truncate bg-secondary/70 px-2 py-1.5 text-[11px] text-secondary-foreground">{photo.title}</span>{isSelected && <span className="absolute right-1.5 top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}</button> })}</div>
-                </div>
-              </> : <>
-                <div><div className="mb-3"><h3 className="text-sm font-semibold">Choose a palette</h3><p className="mt-1 text-xs text-muted-foreground">A quiet backdrop for your images.</p></div><div className="space-y-2">{themes.map((theme) => <button key={theme.id} onClick={() => updateDraft('theme', theme.id)} aria-pressed={draft.theme === theme.id} className={`flex w-full items-center gap-3 rounded-xl border p-3 text-left transition hover:border-primary/60 ${draft.theme === theme.id ? 'border-primary bg-secondary/50' : 'border-border'}`}><span className={`h-10 w-10 rounded-lg border border-foreground/10 ${theme.swatch}`} /><span className="flex-1"><span className="block text-sm font-medium">{theme.name}</span><span className="text-xs text-muted-foreground">Soft, editorial tones</span></span>{draft.theme === theme.id && <Check className="h-4 w-4 text-primary" />}</button>)}</div></div>
-                <div className="border-t border-border pt-4"><h3 className="text-sm font-semibold">Typography</h3><p className="mt-1 text-xs text-muted-foreground">A considered pairing for a personal feel.</p><div className="mt-3 rounded-xl border border-border bg-background p-3"><p className="font-serif text-lg">Aa <span className="text-sm">Lora</span></p><p className="mt-1 text-xs text-muted-foreground">For headlines and gentle emphasis</p></div><div className="mt-2 rounded-xl border border-border bg-background p-3"><p className="text-lg font-medium">Aa <span className="text-sm">DM Sans</span></p><p className="mt-1 text-xs text-muted-foreground">For clear, comfortable reading</p></div></div>
-              </>}
-            </div>
-            <div className="border-t border-border bg-secondary/30 px-5 py-3 text-xs text-muted-foreground">Changes are only saved when you choose <span className="font-medium text-foreground">Save draft</span>.</div>
-          </aside>}
-
-          <section className="flex min-h-[620px] flex-col overflow-hidden rounded-2xl border border-border bg-[#e9e5de] shadow-sm lg:min-h-0" aria-label="Live website preview">
-            <div className="flex h-[54px] shrink-0 items-center justify-between border-b border-[#ddd8cf] bg-card px-3 sm:px-4"><div className="flex min-w-0 items-center gap-2"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary"><Eye className="h-3.5 w-3.5" /></span><div className="min-w-0"><p className="truncate text-xs font-medium">Your live preview</p><p className="hidden text-[10px] text-muted-foreground sm:block">folio.site / {draft.name.toLowerCase().replace(/ /g, '-')}</p></div></div><div className="flex items-center gap-1 rounded-lg border border-border bg-background p-1"><button onClick={() => setDevice('desktop')} aria-label="Desktop preview" aria-pressed={device === 'desktop'} className={`rounded-md p-1.5 transition ${device === 'desktop' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Monitor className="h-4 w-4" /></button><button onClick={() => setDevice('mobile')} aria-label="Mobile preview" aria-pressed={device === 'mobile'} className={`rounded-md p-1.5 transition ${device === 'mobile' ? 'bg-secondary text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}><Smartphone className="h-4 w-4" /></button></div></div>
-            <div className="flex flex-1 justify-center overflow-auto p-3 sm:p-6"><div className={`my-auto min-h-full overflow-hidden shadow-lg transition-all duration-300 ${device === 'mobile' ? 'w-[390px] max-w-full rounded-[1.8rem] border-[7px] border-[#282623]' : 'w-full rounded-xl'}`}><PortfolioPreview draft={draft} theme={selectedTheme} selectedPhotos={selectedPhotos} /></div></div>
-          </section>
+      <section id="top" className="relative isolate flex min-h-[660px] items-center overflow-hidden bg-secondary sm:min-h-[720px]">
+        <img src={heroImage} alt="Photography portfolio website shown beside a portrait photographer" className="absolute inset-0 -z-20 h-full w-full object-cover object-[62%_center] md:object-center" />
+        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-background via-background/90 to-background/5 md:via-background/75" />
+        <div className="mx-auto w-full max-w-[1320px] px-6 pb-20 pt-24 sm:px-10 md:py-28">
+          <div className="max-w-[620px]">
+            <p className="mb-7 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">For smart photographers</p>
+            <h1 className="font-serif text-[clamp(3.5rem,7.3vw,6.7rem)] font-medium leading-[0.98] tracking-[-0.065em]">Website &amp; client galleries</h1>
+            <p className="mt-7 max-w-md text-base leading-7 text-foreground/75 sm:text-lg">Everything you need to present your work beautifully, deliver photos, and grow your business.</p>
+            <a href="#pricing" className="mt-9 inline-flex items-center gap-6 rounded-full bg-foreground px-6 py-4 text-sm font-semibold text-background transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]">Try for free <span aria-hidden="true">↗</span></a>
+            <p className="mt-4 text-xs text-muted-foreground">Start with a free gallery. No coding required.</p>
+          </div>
         </div>
-        <div className="mt-3 flex items-center justify-between px-1 text-[11px] text-muted-foreground"><span className="flex items-center gap-1.5"><Laptop className="h-3.5 w-3.5" /> Responsive by design</span><span className="hidden sm:inline">{user ? 'Saved drafts are private to your account' : 'Sign in to save this draft across devices'}</span><button onClick={() => setFocusPreview((value) => !value)} className="flex items-center gap-1 transition hover:text-foreground">{focusPreview ? 'Show editor' : 'More room'} <ArrowUpRight className="h-3 w-3" /></button></div>
-      </div>
+        <a href="#platform" aria-label="Explore the platform" className="absolute bottom-7 left-1/2 hidden -translate-x-1/2 rounded-full border border-foreground/30 px-4 py-2 text-[10px] uppercase tracking-[0.18em] md:block">Scroll to explore ↓</a>
+      </section>
+
+      <section id="platform" className="border-b border-border bg-background">
+        <div className="mx-auto grid max-w-[1320px] grid-cols-2 gap-x-8 gap-y-8 px-6 py-12 sm:px-10 md:grid-cols-4 md:py-16">
+          {[
+            ['01', 'Website', 'A stylish portfolio that helps you attract clients.'],
+            ['02', 'Galleries', 'Beautiful delivery for photos and video.'],
+            ['03', 'Services', 'Simple tools to help your business grow.'],
+            ['04', 'Community', 'Events, inspiration, and other photographers.'],
+          ].map(([number, title, description]) => (
+            <article key={number} className="border-l border-border pl-4 sm:pl-6">
+              <span className="font-mono text-[11px] text-muted-foreground">{number}</span>
+              <h2 className="mt-3 font-serif text-xl font-semibold sm:text-2xl">{title}</h2>
+              <p className="mt-2 max-w-[220px] text-xs leading-5 text-muted-foreground sm:text-sm">{description}</p>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      <section id="work" className="grid md:min-h-[620px] md:grid-cols-2">
+        <div className="flex flex-col justify-center px-6 py-16 sm:px-12 md:px-[12%] md:py-24">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">01 / Your website</span>
+          <h2 className="mt-6 max-w-lg font-serif text-4xl font-medium leading-[1.08] tracking-[-0.045em] sm:text-5xl">Impressive website. Effortlessly yours.</h2>
+          <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">We’ve made it easy to create a stunning website with no coding or design skills. Focus on your creativity—we’ll take care of the rest.</p>
+          <ul className="mt-8 grid max-w-lg grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            {['Ready-made page templates', '100+ content blocks', 'A wide choice of fonts and palettes', 'Reviews and inquiries on your site'].map((item) => <li key={item} className="flex gap-3 border-t border-border pt-3"><span className="text-muted-foreground">↗</span>{item}</li>)}
+          </ul>
+          <a className="mt-9 inline-flex w-fit items-center gap-3 border-b border-foreground pb-2 text-sm font-semibold transition-opacity hover:opacity-60" href="#pricing">Explore plans <span aria-hidden="true">→</span></a>
+        </div>
+        <div className="relative min-h-[420px] overflow-hidden bg-secondary md:min-h-full">
+          <img src={heroImage} alt="A photographer's finished portfolio website and mobile layout" className="absolute inset-0 h-full w-full object-cover object-[70%_center]" loading="lazy" />
+        </div>
+      </section>
+
+      <section className="grid md:min-h-[620px] md:grid-cols-2">
+        <div className="relative order-2 min-h-[420px] overflow-hidden bg-secondary md:order-1 md:min-h-full">
+          <img src="https://i.wfolio.com/x/zfNWg0RActCaYvCdP8NS6h3QcKqIOO7I/oVCmpsR2A0_zCBuWQbm7dJYwNQ6ysoqE/u9cYu9EFkOUlqvrhI1aLFDKLkm8vY9jm/LQ4EATmPmKHpREYM4uCf3vp3zOMwV_j3/4JPMlC7eZavfP7wu8o0IIQ.jpg" alt="Photography gallery website displayed on desktop and mobile" className="absolute inset-0 h-full w-full object-cover object-center" loading="lazy" />
+        </div>
+        <div className="order-1 flex flex-col justify-center px-6 py-16 sm:px-12 md:order-2 md:px-[12%] md:py-24">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">02 / Client galleries</span>
+          <h2 className="mt-6 max-w-lg font-serif text-4xl font-medium leading-[1.08] tracking-[-0.045em] sm:text-5xl">A beautiful way to deliver your work.</h2>
+          <p className="mt-6 max-w-md text-sm leading-7 text-muted-foreground sm:text-base">Create personal online galleries for every photoshoot. Deliver photos and videos beautifully, impress your clients, and grow your income.</p>
+          <ul className="mt-8 grid max-w-lg grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+            {['Fast photo and video delivery', 'Secure links and passwords', 'Client photo selection', 'Sales tools for additional income'].map((item) => <li key={item} className="flex gap-3 border-t border-border pt-3"><span className="text-muted-foreground">↗</span>{item}</li>)}
+          </ul>
+          <a className="mt-9 inline-flex w-fit items-center gap-3 border-b border-foreground pb-2 text-sm font-semibold transition-opacity hover:opacity-60" href="#pricing">See gallery plans <span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+
+      <section className="bg-secondary px-6 py-20 sm:px-10 sm:py-28">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="mb-12 grid gap-5 md:grid-cols-2 md:items-end">
+            <div><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">One creative home</span><h2 className="mt-5 max-w-xl font-serif text-4xl font-medium leading-tight tracking-[-0.045em] sm:text-5xl">Wfolio. More than a platform.</h2></div>
+            <p className="max-w-lg text-sm leading-7 text-muted-foreground md:justify-self-end">From promotion and sales to education, practical tools, and ready-made resources—everything you need to keep creating and growing.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-12">
+            {featureCards.map((card) => (
+              <article key={card.title} className={`group overflow-hidden rounded-sm bg-card ${card.className}`}>
+                <div className="relative aspect-[1.55] overflow-hidden bg-muted"><img src={card.image} alt={card.title} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.025]" loading="lazy" /></div>
+                <div className="p-5 sm:p-7"><h3 className="font-serif text-xl font-semibold tracking-tight">{card.title}</h3><p className="mt-2 max-w-md text-sm leading-6 text-muted-foreground">{card.description}</p></div>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="bg-foreground px-6 py-20 text-background sm:px-10 sm:py-28">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="grid gap-8 md:grid-cols-[1fr_1.1fr] md:items-end">
+            <div><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-background/60">Made for photographers</span><h2 className="mt-5 max-w-lg font-serif text-4xl font-medium leading-tight tracking-[-0.045em] sm:text-5xl">Everything you need, nothing in your way.</h2></div>
+            <p className="max-w-lg text-sm leading-7 text-background/70 md:justify-self-end">A calm, considered workspace for the business behind your images—so your portfolio and client experience feel as thoughtful as your photography.</p>
+          </div>
+          <div className="mt-16 grid grid-cols-2 gap-x-6 gap-y-9 border-t border-background/20 pt-8 sm:grid-cols-4 sm:gap-x-10">
+            {benefits.map(([title, description]) => <article key={title} className="max-w-[240px]"><h3 className="text-[11px] font-semibold tracking-[0.13em]">{title}</h3><p className="mt-3 text-xs leading-5 text-background/65">{description}</p></article>)}
+          </div>
+          <div className="mt-16 grid grid-cols-2 gap-8 border-t border-background/20 pt-8 sm:grid-cols-4">
+            {[["10+", 'years helping photographers'], ["14M+", 'galleries created'], ["3B+", 'photos uploaded'], ["155+", 'countries worldwide']].map(([value, label]) => <div key={value}><p className="font-serif text-4xl font-medium tracking-tight sm:text-5xl">{value}</p><p className="mt-2 text-xs text-background/60">{label}</p></div>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="px-6 py-20 sm:px-10 sm:py-28">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+            <div><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">A creative community</span><h2 className="mt-5 font-serif text-4xl font-medium tracking-[-0.045em] sm:text-5xl">The best are with us.</h2></div>
+            <p className="max-w-sm text-sm leading-6 text-muted-foreground">Photographers around the world trust Wfolio to bring their work to life.</p>
+          </div>
+          <div className="mt-10 grid grid-cols-3 gap-2 sm:grid-cols-6 sm:gap-3">
+            {galleryFaces.map((image, index) => <div key={image} className="aspect-[0.83] overflow-hidden rounded-sm bg-muted"><img src={image} alt={`Photographer portfolio example ${index + 1}`} className="h-full w-full object-cover grayscale transition duration-500 hover:scale-105 hover:grayscale-0" loading="lazy" /></div>)}
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" className="bg-secondary px-6 py-20 sm:px-10 sm:py-28">
+        <div className="mx-auto max-w-[1320px]">
+          <div className="mb-12 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">Pricing</span><h2 className="mt-5 font-serif text-4xl font-medium tracking-[-0.045em] sm:text-5xl">Room to grow.</h2></div><p className="max-w-md text-sm leading-6 text-muted-foreground">Start with galleries for free, then choose the plan that fits your work.</p></div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <PlanCard name="Free galleries" price="Free" description="A thoughtful first step for delivering client work." features={['120 GB client galleries', 'Photo and video delivery', 'Client photo selection', 'Free Wfolio address']} />
+            <PlanCard name="Galleries" price="from $18.9 / year" description="More space and tools for your growing client list." features={['300 GB, 1 TB, or unlimited', 'Online payments and sales', 'Face recognition', 'Custom domain option']} featured />
+            <PlanCard name="Site + galleries" price="from $31.9 / year" description="Your website, portfolio, and client delivery together." features={['Website builder and templates', 'Unlimited website pages', 'Blog and portfolio showcase', 'All gallery features']} />
+          </div>
+          <p className="mt-6 text-center text-xs text-muted-foreground">Flexible monthly and annual options are available.</p>
+        </div>
+      </section>
+
+      <section id="faq" className="px-6 py-20 sm:px-10 sm:py-28">
+        <div className="mx-auto grid max-w-[1320px] gap-12 md:grid-cols-[0.8fr_1.2fr]">
+          <div><span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground">FAQ</span><h2 className="mt-5 max-w-sm font-serif text-4xl font-medium leading-tight tracking-[-0.045em] sm:text-5xl">A few things you might be wondering.</h2><p className="mt-5 max-w-sm text-sm leading-6 text-muted-foreground">Start simply. Your portfolio and galleries can grow with your photography business.</p></div>
+          <div className="border-t border-border">
+            {questions.map(([question, answer]) => <details key={question} className="group border-b border-border py-5"><summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-serif text-lg font-medium"><span>{question}</span><span className="text-muted-foreground transition-transform group-open:rotate-45" aria-hidden="true">+</span></summary><p className="max-w-2xl pt-4 pr-8 text-sm leading-6 text-muted-foreground">{answer}</p></details>)}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative isolate overflow-hidden bg-foreground px-6 py-24 text-background sm:px-10 sm:py-32">
+        <img src="https://i.wfolio.com/x/M5WK4BLIgG-qyI8ZOeSuCkq8wa8L1RO1/el2Cn27_lTYb0d7zo24iltXo3Au_bmKO/DwmminVp1S5uLdbvtyDRHx6RHv32rloO/rDDQlucKq9mujSySCP5dqnzlazn56v74/M-gMsQeDvWLpZ-JHvGu7V3vkVB7v5NvS/939n9trdYU_k78MHJ9DfJlqzTRgR_wH7.jpg" alt="Photography book and gallery experience" className="absolute inset-0 -z-20 h-full w-full object-cover opacity-35" loading="lazy" />
+        <div className="absolute inset-0 -z-10 bg-foreground/65" />
+        <div className="mx-auto max-w-[1320px]">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-background/60">Your next chapter</span>
+          <h2 className="mt-6 max-w-3xl font-serif text-5xl font-medium leading-[1.03] tracking-[-0.055em] sm:text-7xl">Make space for the work you love.</h2>
+          <p className="mt-6 max-w-lg text-sm leading-7 text-background/70 sm:text-base">Create your website, deliver client galleries, and bring your photography business together in one place.</p>
+          <a href="#pricing" className="mt-9 inline-flex items-center gap-6 rounded-full bg-background px-6 py-4 text-sm font-semibold text-foreground transition-transform duration-200 hover:scale-[1.03] active:scale-[0.98]">Try Wfolio for free <span aria-hidden="true">↗</span></a>
+        </div>
+      </section>
+
+      <footer className="bg-foreground px-6 py-8 text-background sm:px-10">
+        <div className="mx-auto flex max-w-[1320px] flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><a href="#top" className="font-serif text-xl font-bold tracking-[-0.07em]">wfolio</a><p className="text-xs text-background/60">A website builder and cloud drive for photographers.</p><a className="text-xs transition-opacity hover:opacity-60" href="#top">Back to top ↑</a></div>
+      </footer>
     </main>
   )
 }
 
-function Field({ label, children }: { label: string; children: ReactNode }) {
-  return <label className="block space-y-1.5"><span className="block text-xs font-medium text-secondary-foreground">{label}</span>{children}</label>
-}
-
-function PortfolioPreview({ draft, theme, selectedPhotos }: { draft: PortfolioSettings; theme: (typeof themes)[number]; selectedPhotos: typeof photos }) {
+function PlanCard({ name, price, description, features, featured = false }: { name: string; price: string; description: string; features: string[]; featured?: boolean }) {
   return (
-    <div className="min-h-full" style={{ backgroundColor: theme.paper, color: theme.ink }}>
-      <nav className="flex items-center justify-between px-5 py-4 sm:px-9 sm:py-6" aria-label="Portfolio website"><span className="font-serif text-sm font-medium sm:text-base">{draft.name || 'Your name'}</span><div className="flex items-center gap-3 text-[9px] sm:gap-6 sm:text-[11px]" style={{ color: theme.ink }}><a href="#work" className="transition-opacity hover:opacity-60">Selected work</a><a href="#about" className="hidden transition-opacity hover:opacity-60 sm:inline">About</a><a href="#contact" className="transition-opacity hover:opacity-60">Contact <ArrowUpRight className="ml-0.5 inline h-3 w-3" /></a></div></nav>
-      <section className="grid items-center gap-5 px-5 pb-7 pt-4 sm:grid-cols-[0.82fr_1.18fr] sm:gap-8 sm:px-9 sm:pb-10 sm:pt-3"><div className="order-2 sm:order-1"><p className="mb-3 text-[9px] uppercase tracking-[0.2em] sm:mb-5 sm:text-[10px]" style={{ color: theme.accent }}>{draft.specialty || 'Photographer'}</p><h2 className="max-w-sm font-serif text-[34px] leading-[1.07] tracking-[-0.04em] sm:text-[clamp(38px,4.2vw,68px)]">{draft.headline || 'Your story, in photographs.'}</h2><p className="mt-3 text-[10px] sm:mt-5 sm:text-xs" style={{ color: theme.accent }}>{draft.location || 'Based somewhere lovely'}</p><a href="#work" className="mt-5 inline-flex items-center gap-2 border-b pb-1 text-[10px] font-medium sm:mt-8 sm:text-xs" style={{ borderColor: theme.accent }}>Explore my work <ArrowUpRight className="h-3 w-3" /></a></div><div className="order-1 relative h-[210px] overflow-hidden sm:order-2 sm:h-[clamp(260px,34vw,470px)]">{selectedPhotos[0] ? <img src={selectedPhotos[0].src} alt={selectedPhotos[0].alt} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center bg-secondary/50 text-sm text-muted-foreground">Choose a featured photo</div>}<span className="absolute bottom-3 left-3 bg-card/90 px-2.5 py-1.5 text-[9px] tracking-wide">01 — {selectedPhotos[0]?.title ?? 'Featured work'}</span></div></section>
-      <section id="work" className="px-5 pb-8 sm:px-9 sm:pb-12"><div className="mb-3 flex items-end justify-between border-t pt-4 sm:mb-5 sm:pt-6" style={{ borderColor: `${theme.ink}22` }}><div><p className="text-[8px] uppercase tracking-[0.2em]" style={{ color: theme.accent }}>A collection of moments</p><h3 className="mt-1 font-serif text-lg sm:text-2xl">Selected work</h3></div><span className="text-[9px] sm:text-[10px]">{String(selectedPhotos.length).padStart(2, '0')} stories</span></div>{selectedPhotos.length > 1 ? <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">{selectedPhotos.slice(1).map((photo, index) => <figure key={photo.id} className="group overflow-hidden"><img src={photo.src} alt={photo.alt} className="aspect-[1.1] w-full object-cover transition duration-500 group-hover:scale-[1.03]" /><figcaption className="pt-1.5 text-[9px] sm:pt-2 sm:text-[10px]">{String(index + 2).padStart(2, '0')} — {photo.title}</figcaption></figure>)}</div> : <p className="py-8 text-sm" style={{ color: theme.accent }}>Select a few more photos to build your gallery.</p>}</section>
-      <section id="about" className="flex items-center justify-between border-t px-5 py-4 sm:px-9 sm:py-6" style={{ borderColor: `${theme.ink}22` }}><p className="max-w-xs font-serif text-sm sm:text-lg">“The ordinary is where the extraordinary begins.”</p><p className="text-[9px] uppercase tracking-[0.16em] sm:text-[10px]">{draft.name || 'Your name'} · {draft.location}</p></section>
-      <footer id="contact" className="flex items-center justify-between px-5 py-3 text-[9px] sm:px-9 sm:py-4 sm:text-[10px]" style={{ backgroundColor: theme.ink, color: theme.paper }}><span>Have a story to tell?</span><a href="mailto:hello@example.com" className="font-medium transition-opacity hover:opacity-70">Let’s make something <ArrowUpRight className="ml-1 inline h-3 w-3" /></a></footer>
-    </div>
+    <article className={`flex min-h-[400px] flex-col border border-border p-6 sm:p-8 ${featured ? 'bg-foreground text-background' : 'bg-card text-foreground'}`}>
+      <p className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${featured ? 'text-background/65' : 'text-muted-foreground'}`}>{name}</p>
+      <h3 className="mt-7 font-serif text-3xl font-medium tracking-tight">{price}</h3>
+      <p className={`mt-3 min-h-12 text-sm leading-6 ${featured ? 'text-background/70' : 'text-muted-foreground'}`}>{description}</p>
+      <ul className="mt-6 flex-1 space-y-3 border-t border-current/15 pt-6 text-sm">{features.map((feature) => <li key={feature} className="flex gap-3"><span aria-hidden="true">+</span>{feature}</li>)}</ul>
+      <a href="#faq" className={`mt-8 inline-flex items-center justify-center rounded-full px-5 py-3 text-sm font-semibold transition-transform duration-200 hover:scale-[1.02] active:scale-[0.98] ${featured ? 'bg-background text-foreground' : 'bg-foreground text-background'}`}>Choose plan <span className="ml-3" aria-hidden="true">→</span></a>
+    </article>
   )
-}
-
-function LoadingScreen() {
-  return <div className="flex min-h-dvh items-center justify-center bg-background"><div className="flex items-center gap-3 text-sm text-muted-foreground"><span className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />Opening your studio…</div></div>
 }
